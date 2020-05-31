@@ -158,6 +158,9 @@ public class Window extends JFrame {
     }
 
     public void play() {
+        if (videos.isEmpty()) {
+            return;
+        }
         getMediaPlayer().playMedia(videos.get(videoIndex));
         setWindowTitle();
         // System.out.println("play video..." + getMediaPlayer().getMediaMeta().getTitle());
