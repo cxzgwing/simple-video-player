@@ -38,6 +38,10 @@ public class Window extends JFrame {
     private java.util.List<String> videos;
     // 当前播放视频的位置
     private int videoIndex;
+    // 声音控制进度条
+    private JProgressBar volumeProgress;
+    // 音量显示标签
+    private Label volumeLabel;
 
     public Window(String videoFolder) {
         initVideoFilesPath(videoFolder);
@@ -141,13 +145,77 @@ public class Window extends JFrame {
         displaySpeed.setEnabled(false);
         buttonPanel.add(displaySpeed);
 
+        // 添加声音控制进度条
+        volumeProgress = new JProgressBar();
+        volumeProgress.setFocusable(false);
+        volumeProgress.setMinimum(0);
+        volumeProgress.setMaximum(100);
+        volumeProgress.setValue(100);
+        volumeProgress.setPreferredSize(new Dimension(100, 10));
+        volumeProgress.addMouseListener(mouseClickedSetVolumeValue());
+        buttonPanel.add(volumeProgress);
+
+        // 音量显示
+        volumeLabel = new Label();
+        volumeLabel.setFocusable(false);
+        volumeLabel.setEnabled(false);
+        setVolumeLabel(volumeProgress.getValue());
+        buttonPanel.add(volumeLabel);
+
+
         // 监听窗口大小，设置进度条宽度为窗口宽度（但是对于最大化和还原窗口无效，原因未知<-_->）
         this.addComponentListener(windowResizedResetProgressWidth());
         // 监听窗口最大化和还原，设置进度条宽度为窗口宽度
         this.addWindowStateListener(windowStateChangedResetProgressWidth());
+        // 监听鼠标滑轮滚动，设置音量
+        this.addMouseWheelListener(mouseWheelMovedSetVolume());
 
         continueTimer = getContinueTimer();
         continueTimer.start();
+    }
+
+    private MouseAdapter mouseWheelMovedSetVolume() {
+        return new MouseAdapter() {
+            @Override
+            public void mouseWheelMoved(MouseWheelEvent e) {
+                // 1-下，-1-上
+                int wheelRotation = e.getWheelRotation();
+                if (wheelRotation == 1) {
+                    // 减小音量
+                    setVolume(volumeProgress.getValue() - 5);
+                } else if (wheelRotation == -1) {
+                    // 增大音量
+                    setVolume(volumeProgress.getValue() + 5);
+                }
+            }
+        };
+    }
+
+    private void setVolumeLabel(int value) {
+        volumeLabel.setText(value + "%");
+    }
+
+    private MouseAdapter mouseClickedSetVolumeValue() {
+        return new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                setVolume(e.getX());
+            }
+        };
+    }
+
+    private void setVolume(int value) {
+        if (value < 0) {
+            value = 0;
+        } else if (value > 100) {
+            value = 100;
+        }
+        if (volumeProgress.getValue() == value) {
+            return;
+        }
+        volumeProgress.setValue(value);
+        setVolumeLabel(value);
+        getMediaPlayer().setVolume(value);
     }
 
     private void initVideoFilesPath(String videoFolder) {
