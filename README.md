@@ -10,4 +10,4 @@
 4、时间显示、播放速度显示
 
 ## 项目与工具
-maven、java8、vlc-3.8.0、log4j-1.2.17
+maven、java8、vlc-3.8.0、log4j-2.13.3
