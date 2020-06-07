@@ -26,7 +26,7 @@ public class Window extends JFrame {
     private JProgressBar progress;
     // 暂停按钮
     private Button pauseButton;
-    // 显示播放速度的按钮
+    // 显示播放速度的标签
     private Label displaySpeed;
     // 显示时间
     private Label displayTime;
