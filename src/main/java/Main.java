@@ -15,13 +15,15 @@ public class Main {
         // 加载dll
         NativeLibrary.addSearchPath(RuntimeUtil.getLibVlcLibraryName(), "vlc");
 
-        // 方式一：直接传文件夹
-        String videoFolder = "E:\\tmp\\test\\videoTest";
-        Window frame = new Window(videoFolder);
-        frame.setVisible(true);
-        frame.play();
+        Window frame = new Window();
 
-        // 方式二：传文件
+        // 旧版方式一：直接传文件夹
+        // String videoFolder = "E:\\tmp\\test\\videoTest";
+        // Window frame = new Window(videoFolder);
+        // frame.setVisible(true);
+        // frame.play();
+
+        // 旧版方式二：传文件
         // String filePath = "E:\\tmp\\test\\videoTest\\01_编程语言运行机制.avi";
         // EmbeddedMediaPlayer mediaPlayer = frame.getMediaPlayer();
         // mediaPlayer.playMedia(filePath);

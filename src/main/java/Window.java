@@ -1,6 +1,9 @@
 import java.awt.*;
 import java.awt.event.*;
+import java.io.File;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Objects;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -15,10 +18,17 @@ public class Window extends JFrame {
     private static final int PROGRESS_HEIGHT = 10;
     private static final int PROGRESS_MIN_VALUE = 0;
     private static final int PROGRESS_MAX_VALUE = 100;
+    private static final int WINDOW_X = 100;
+    private static final int WINDOW_Y = 100;
+    private static final int WINDOW_WIDTH = 800;
+    private static final int WINDOW_HEIGHT = 600;
+    private static final int LIST_WINDOW_WIDTH = 200;
     // 总时间
     private static String TOTAL_TIME;
     // 播放速度
     private float speed;
+    // 首次播放
+    private boolean firstPlay = true;
 
     // 播放器组件
     private EmbeddedMediaPlayerComponent mediaPlayerComponent;
@@ -42,9 +52,18 @@ public class Window extends JFrame {
     private JProgressBar volumeProgress;
     // 音量显示标签
     private Label volumeLabel;
+    // 文件对话框
+    private FileDialog fileDialog;
+    // 播放文件列表按钮
+    private Button listButton;
+    // 播放文件列表窗口
+    private JFrame listWindow;
+    // 播放文件列表显示内容
+    private JTextArea listContent;
 
-    public Window(String videoFolder) {
-        initVideoFilesPath(videoFolder);
+    public Window() {
+        this.videos = new ArrayList<>(10);
+        // initVideoFilesPath(videoFolder);
         // 设置默认速度为原速
         speed = 1.0f;
         // 设置窗口标题
@@ -58,7 +77,7 @@ public class Window extends JFrame {
         // setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         // 设置窗口位置
-        setBounds(100, 100, 800, 600);
+        setBounds(WINDOW_X, WINDOW_Y, WINDOW_WIDTH, WINDOW_HEIGHT);
         // 最大化显示窗口
         // setExtendedState(JFrame.MAXIMIZED_BOTH);
 
@@ -103,7 +122,7 @@ public class Window extends JFrame {
         progress.addMouseListener(setVideoPlayPoint());
         // 定时器
         progressTimer = getProgressTimer();
-        progressTimer.start();
+        // progressTimer.start();
 
         progressPanel.add(progress);
         progressPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -112,13 +131,19 @@ public class Window extends JFrame {
 
         // ------按钮组件面板------
         JPanel buttonPanel = new JPanel();
-        // contentPane.add(buttonPanel, BorderLayout.SOUTH);
         buttonPanel.setAlignmentX(Component.CENTER_ALIGNMENT);
         bottomPanel.add(buttonPanel);
 
         displayTime = new Label();
         displayTime.setText(getTimeString());
         buttonPanel.add(displayTime);
+
+        Button chooseButton = new Button("choose");
+        fileDialog = new FileDialog(this);
+        fileDialog.setMultipleMode(true);
+        chooseButton.setFocusable(false);
+        chooseButton.addMouseListener(mouseClickedChooseFiles());
+        buttonPanel.add(chooseButton);
 
         // 重置按钮：设置播放速度为原速
         Button resetButton = new Button("reset");
@@ -127,7 +152,8 @@ public class Window extends JFrame {
         buttonPanel.add(resetButton);
 
         // 暂停/播放按钮
-        pauseButton = new Button("pause");
+        pauseButton = new Button("play");
+        pauseButton.setPreferredSize(new Dimension(49, 23));
         pauseButton.addKeyListener(spaceKeyPressMediaPause());
         pauseButton.addMouseListener(mouseClickedMediaPause());
         buttonPanel.add(pauseButton);
@@ -162,6 +188,16 @@ public class Window extends JFrame {
         setVolumeLabel(volumeProgress.getValue());
         buttonPanel.add(volumeLabel);
 
+        // 播放文件列表显示内容
+        listContent = new JTextArea();
+        listContent.setLineWrap(true);
+        listContent.setFocusable(false);
+
+        // 播放文件列表按钮
+        listButton = new Button("list");
+        listButton.setFocusable(false);
+        listButton.addMouseListener(mouseClickedSetListWindow());
+        buttonPanel.add(listButton);
 
         // 监听窗口大小，设置进度条宽度为窗口宽度（但是对于最大化和还原窗口无效，原因未知<-_->）
         this.addComponentListener(windowResizedResetProgressWidth());
@@ -169,9 +205,113 @@ public class Window extends JFrame {
         this.addWindowStateListener(windowStateChangedResetProgressWidth());
         // 监听鼠标滑轮滚动，设置音量
         this.addMouseWheelListener(mouseWheelMovedSetVolume());
+        this.addComponentListener(windowMovedAction());
 
         continueTimer = getContinueTimer();
-        continueTimer.start();
+        // continueTimer.start();
+
+        // 设置窗口最小值
+        this.setMinimumSize(new Dimension(600, 400));
+
+        // 设置窗口可见
+        this.setVisible(true);
+    }
+
+    private ComponentAdapter windowMovedAction() {
+        return new ComponentAdapter() {
+            @Override
+            public void componentMoved(ComponentEvent e) {
+                setListWindowInvisible();
+            }
+        };
+    }
+
+    private MouseAdapter mouseClickedSetListWindow() {
+        return new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (listWindow == null) {
+                    // 播放文件列表窗口
+                    listWindow = new JFrame();
+                    listWindow.add(listContent);
+                    listWindow.setUndecorated(true);
+                    // 设置透明度
+                    listWindow.setOpacity(0.8f);
+                    setListWindowBounds();
+                    listWindow.setVisible(true);
+                    setListWindowShownColor();
+                    listWindow.addComponentListener(setListWindowBackgroundWhenShownOrHidden());
+                    return;
+                }
+                int x = getX();
+                int width = getWidth();
+                if (WINDOW_X != x || WINDOW_WIDTH != width) {
+                    setListWindowBounds();
+                }
+                boolean visible = listWindow.isVisible();
+                if (visible) {
+                    listWindow.setVisible(false);
+                } else {
+                    listWindow.setVisible(true);
+                }
+            }
+        };
+    }
+
+    private ComponentAdapter setListWindowBackgroundWhenShownOrHidden() {
+        return new ComponentAdapter() {
+            @Override
+            public void componentShown(ComponentEvent e) {
+                setListWindowShownColor();
+            }
+
+            @Override
+            public void componentHidden(ComponentEvent e) {
+                setListWindowHiddenColor();
+            }
+        };
+    }
+
+    private void setListWindowHiddenColor() {
+        listButton.setBackground(new Color(238, 238, 238));
+    }
+
+    private void setListWindowShownColor() {
+        listButton.setBackground(new Color(141, 141, 141));
+    }
+
+    private void setListWindowBounds() {
+        if (listWindow != null) {
+            listWindow.setBounds(getWidth() + getX() - LIST_WINDOW_WIDTH - 6, getY() + 37,
+                    LIST_WINDOW_WIDTH - 8, getHeight() - 100);
+        }
+    }
+
+    private MouseAdapter mouseClickedChooseFiles() {
+        return new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                fileDialog.setVisible(true);
+                File[] files = fileDialog.getFiles();
+                videos.clear();
+                listContent.setText("");
+                for (File file : files) {
+                    videos.add(file.getAbsolutePath());
+                    listContent.append(videos.size() + "." + file.getName() + "\n");
+                }
+                videos.sort(Comparator.naturalOrder());
+                if (!Objects.isNull(getMediaPlayer())) {
+                    getMediaPlayer().stop();
+                }
+                pauseButton.setLabel("play");
+                firstPlay = true;
+                setProgress(0, 0);
+                progressTimer.stop();
+                continueTimer.stop();
+                videoIndex = 0;
+                loading();
+            }
+        };
     }
 
     private MouseAdapter mouseWheelMovedSetVolume() {
@@ -225,13 +365,33 @@ public class Window extends JFrame {
         // System.out.println(videos);
     }
 
-    public void play() {
+    private void loading() {
+        if (videos.isEmpty()) {
+            return;
+        }
+        String path = videos.get(videoIndex);
+        setTitle("VideoPlayer-" + FileUtils.getFileName(path) + "（预加载）");
+    }
+
+    private void initPlay() {
         if (videos.isEmpty()) {
             return;
         }
         getMediaPlayer().playMedia(videos.get(videoIndex));
         setWindowTitle();
-        // System.out.println("play video..." + getMediaPlayer().getMediaMeta().getTitle());
+        pauseButton.setLabel("pause");
+        setProgress(getMediaPlayer().getTime(), getMediaPlayer().getLength());
+        progressTimer.start();
+        continueTimer.start();
+        this.firstPlay = false;
+    }
+
+    private void play() {
+        if (videos.isEmpty()) {
+            return;
+        }
+        getMediaPlayer().playMedia(videos.get(videoIndex));
+        setWindowTitle();
     }
 
     private void setWindowTitle() {
@@ -296,9 +456,7 @@ public class Window extends JFrame {
                     return;
                 }
                 // 设置进度值
-                long total = getMediaPlayer().getLength();
-                long curr = getMediaPlayer().getTime();
-                setProgress(curr, total);
+                setProgress(getMediaPlayer().getTime(), getMediaPlayer().getLength());
             }
         });
     }
@@ -319,12 +477,22 @@ public class Window extends JFrame {
                 if (state.getNewState() == 0) {
                     // System.out.println("窗口恢复到初始状态");
                     setProgressWidthAutoAdaptWindow();
+                    setListWindowInvisible();
+                    setListWindowBounds();
                 } else if (state.getNewState() == 6) {
                     // System.out.println("窗口最大化");
                     setProgressWidthAutoAdaptWindow();
+                    setListWindowInvisible();
+                    setListWindowBounds();
                 }
             }
         };
+    }
+
+    private void setListWindowInvisible() {
+        if (listWindow != null && listWindow.isVisible()) {
+            listWindow.setVisible(false);
+        }
     }
 
     private void setProgressWidthAutoAdaptWindow() {
@@ -336,6 +504,7 @@ public class Window extends JFrame {
             @Override
             public void componentResized(ComponentEvent e) {
                 setProgressWidthAutoAdaptWindow();
+                setListWindowInvisible();
             }
         };
     }
@@ -410,7 +579,14 @@ public class Window extends JFrame {
         return new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                getMediaPlayer().pause();
+                if (videos.isEmpty()) {
+                    return;
+                }
+                if (firstPlay) {
+                    initPlay();
+                    return;
+                }
+                setMediaStatusAndPauseButton();
                 if (progressTimer.isRunning()) {
                     progressTimer.stop();
                 } else {
@@ -418,6 +594,16 @@ public class Window extends JFrame {
                 }
             }
         };
+    }
+
+    private void setMediaStatusAndPauseButton() {
+        if (getMediaPlayer().isPlaying()) {
+            getMediaPlayer().pause();
+            pauseButton.setLabel("play");
+        } else {
+            getMediaPlayer().play();
+            pauseButton.setLabel("pause");
+        }
     }
 
     private WindowFocusListener getWindowFocusListener() {
@@ -445,8 +631,15 @@ public class Window extends JFrame {
         return new KeyAdapter() {
             @Override
             public void keyPressed(KeyEvent e) {
+                if (videos.isEmpty()) {
+                    return;
+                }
+                if (firstPlay) {
+                    initPlay();
+                    return;
+                }
                 if (e.getKeyCode() == KeyEvent.VK_SPACE) {
-                    getMediaPlayer().pause();
+                    setMediaStatusAndPauseButton();
                 }
             }
         };

@@ -6,6 +6,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Stack;
 
+import org.apache.commons.lang3.StringUtils;
+
 public class FileUtils {
 
     public static List<String> readFilePath(String folderPath) {
@@ -52,4 +54,10 @@ public class FileUtils {
         return list;
     }
 
+    public static String getFileName(String path) {
+        if (StringUtils.isBlank(path) || !path.contains(File.separator)) {
+            return path;
+        }
+        return path.substring(path.lastIndexOf(File.separator) + 1);
+    }
 }
